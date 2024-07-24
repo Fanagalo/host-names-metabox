@@ -141,6 +141,12 @@ function save_custom_meta($post_id)
         $meta_to_delete = array_diff($old_meta_values, $new_meta_values);
         $meta_to_add = array_diff($new_meta_values, $old_meta_values);
 
+        echo "old_meta_values"; var_dump($old_meta_values);
+        echo "new_meta_values"; var_dump($new_meta_values);
+        echo "meta_to_deletes"; var_dump($meta_to_delete);
+        echo "meta_to_add"; var_dump($meta_to_add);
+        
+
         // Delete removed meta values
         foreach ($meta_to_delete as $meta_value) {
             delete_post_meta($post_id, $meta_key, $meta_value);
@@ -152,7 +158,7 @@ function save_custom_meta($post_id)
                 add_post_meta($post_id, $meta_key, $meta_value, false);
             }
         }
-    }
+    }  
 }
 add_action('save_post', 'save_custom_meta');
 
