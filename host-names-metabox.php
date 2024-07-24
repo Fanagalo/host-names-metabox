@@ -3,7 +3,7 @@
 /*
 Plugin Name: Host Names Metabox
 Description: User interface for vernacular names, synonyms and notes
-Version: 1.12
+Version: 1.13
 Author: Jaap Wiering
 Author URI: https://fanagalo.nl
 Text Domain: bladmineerders-fngl
