@@ -3,7 +3,7 @@
 /*
 Plugin Name: Host Names Metabox
 Description: User interface for vernacular names, synonyms and notes
-Version: 1.13
+Version: 1.12
 Author: Jaap Wiering
 Author URI: https://fanagalo.nl
 Text Domain: bladmineerders-fngl
@@ -31,31 +31,32 @@ function nice_name($subject)
     return str_replace($search, $replace, $subject);
 }
 
-    // Add custom meta box
-    function add_custom_meta_box() {
+// Add custom meta box
+function add_custom_meta_box()
+{
 
-        // Conditional for certain templates
-        global $post;
+    // Conditional for certain templates
+    global $post;
 
-        if (!empty($post)) {
-            $allowed_templates = array('host-genus-determination.php', 'host-species-determination.php');
-            $template = get_post_meta($post->ID, '_wp_page_template', true);
+    if (!empty($post)) {
+        $allowed_templates = array('host-genus-determination.php', 'host-species-determination.php');
+        $template = get_post_meta($post->ID, '_wp_page_template', true);
 
-            if (in_array( $template, $allowed_templates)) {
+        if (in_array($template, $allowed_templates)) {
 
-                // Creation of meta box
-                add_meta_box(
-                    'custom_meta_box', // $id
-                    'Name alternatives', // $title
-                    'show_custom_meta_box', // $callback
-                    'page', // $screen
-                    'normal', // $context
-                    'high' // $priority
-                );
-            }
+            // Creation of meta box
+            add_meta_box(
+                'custom_meta_box', // $id
+                'Name alternatives', // $title
+                'show_custom_meta_box', // $callback
+                'page', // $screen
+                'normal', // $context
+                'high' // $priority
+            );
         }
     }
-    add_action('add_meta_boxes', 'add_custom_meta_box');
+}
+add_action('add_meta_boxes', 'add_custom_meta_box');
 
 // Show custom meta box
 function show_custom_meta_box()
@@ -74,11 +75,11 @@ function show_custom_meta_box()
             <?php if (!empty($meta_values)) :
                 foreach ($meta_values as $value) { ?>
                     <p>
-                        <label for="<?php echo esc_attr($meta_key); ?>"><?php echo esc_html($meta_key)?></label>
+                        <label for="<?php echo esc_attr($meta_key); ?>"><?php echo esc_html($meta_key) ?></label>
                         <input type="text" name="<?php echo esc_attr($meta_key); ?>[]" value="<?php echo esc_attr($value); ?>" size="60">
                         <button class="remove_field button button-small">Remove</button>
                     </p>
-                <?php }
+            <?php }
             endif; ?>
         </div>
         <p>
@@ -121,12 +122,14 @@ function save_custom_meta($post_id)
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
         return $post_id;
     }
+
+    // Check if it is a revision.
+    if (wp_is_post_revision($post_id)) {
+        return $post_id;
+    }
+
     // Check permissions
-    if (isset($_POST['post_type']) && 'page' === $_POST['post_type']) {
-        if (!current_user_can('edit_page', $post_id)) {
-            return $post_id;
-        }
-    } elseif (!current_user_can('edit_post', $post_id)) {
+    if (!current_user_can('edit_page', $post_id)) {
         return $post_id;
     }
 
@@ -136,16 +139,12 @@ function save_custom_meta($post_id)
         // Get existing meta values
         $old_meta_values = get_post_meta($post_id, $meta_key, false);
         $new_meta_values = isset($_POST[$meta_key]) ? array_map('sanitize_text_field', $_POST[$meta_key]) : array();
+        // First make sure the values are unique, so there is only one value if a user fills in the same value twice.
+        $unique_new_meta_values = array_unique($new_meta_values);
 
         // Compare old and new meta values
-        $meta_to_delete = array_diff($old_meta_values, $new_meta_values);
-        $meta_to_add = array_diff($new_meta_values, $old_meta_values);
-
-        echo "old_meta_values"; var_dump($old_meta_values);
-        echo "new_meta_values"; var_dump($new_meta_values);
-        echo "meta_to_deletes"; var_dump($meta_to_delete);
-        echo "meta_to_add"; var_dump($meta_to_add);
-        
+        $meta_to_delete = array_diff($old_meta_values, $unique_new_meta_values);
+        $meta_to_add = array_diff($unique_new_meta_values, $old_meta_values);
 
         // Delete removed meta values
         foreach ($meta_to_delete as $meta_value) {
@@ -158,9 +157,9 @@ function save_custom_meta($post_id)
                 add_post_meta($post_id, $meta_key, $meta_value, false);
             }
         }
-    }  
+    }
 }
-add_action('save_post', 'save_custom_meta');
+add_action('save_post_page', 'save_custom_meta');
 
 // Function to display Name meta fields
 function display_name_meta($post_id)
