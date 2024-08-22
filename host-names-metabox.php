@@ -3,7 +3,7 @@
 /*
 Plugin Name: Host Names Metabox
 Description: User interface for vernacular names, synonyms and notes
-Version: 1.12
+Version: 1.20
 Author: Jaap Wiering
 Author URI: https://fanagalo.nl
 Text Domain: bladmineerders-fngl
@@ -18,10 +18,16 @@ function enqueue_admin_styles()
 add_action('admin_enqueue_scripts', 'enqueue_admin_styles');
 
 // Get names for the keys, used in functions as a sort of global variable
-function get_names_keys()
+function get_multi_value_name_keys()
 {
-    return ['en_vernacular', 'nl_vernacular', 'synonym', 'name_note'];
+    return ['en_vernacular', 'nl_vernacular', 'synonym'];
 }
+
+function get_single_value_name_keys()
+{
+    return ['name_note'];
+}
+
 
 // Substitutes key names with nice names
 function nice_name($subject)
@@ -62,30 +68,33 @@ add_action('add_meta_boxes', 'add_custom_meta_box');
 function show_custom_meta_box()
 {
     global $post;
-    $meta_keys = get_names_keys();
+    $multi_value_meta_keys = get_multi_value_name_keys();
+    $single_value_meta_keys = get_single_value_name_keys();
 
 ?>
 
     <input type="hidden" name="custom_meta_box_nonce" value="<?php echo wp_create_nonce(basename(__FILE__)); ?>">
 
-    <?php foreach ($meta_keys as $meta_key) : ?>
-        <?php $meta_values = get_post_meta($post->ID, $meta_key, false); ?>
-        <div id="<?php echo esc_attr($meta_key); ?>-fields">
-            <h3><?php echo esc_html(nice_name($meta_key)); ?></h3>
-            <?php if (!empty($meta_values)) :
-                foreach ($meta_values as $value) { ?>
+    <?php
+    // keys with multiple values in a text input field
+
+    foreach ($multi_value_meta_keys as $multi_value_meta_key) : ?>
+        <?php $multi_meta_values = get_post_meta($post->ID, $multi_value_meta_key, false); ?>
+        <div id="<?php echo esc_attr($multi_value_meta_key); ?>-fields">
+            <h3><?php echo esc_html(nice_name($multi_value_meta_key)); ?></h3>
+            <?php if (!empty($multi_meta_values)) :
+                foreach ($multi_meta_values as $multi_value) { ?>
                     <p>
-                        <label for="<?php echo esc_attr($meta_key); ?>"><?php echo esc_html($meta_key) ?></label>
-                        <input type="text" name="<?php echo esc_attr($meta_key); ?>[]" value="<?php echo esc_attr($value); ?>" size="60">
+                        <label for="<?php echo esc_attr($multi_value_meta_key); ?>"><?php echo esc_html($multi_value_meta_key) ?></label>
+                        <input type="text" name="<?php echo esc_attr($multi_value_meta_key); ?>[]" value="<?php echo esc_attr($multi_value); ?>" size="60">
                         <button class="remove_field button button-small">Remove</button>
                     </p>
             <?php }
             endif; ?>
         </div>
         <p>
-            <button class="add_field_button button button-small button-primary" data-field="<?php echo esc_attr($meta_key); ?>">Add Row</button>
+            <button class="add_field_button button button-small button-primary" data-field="<?php echo esc_attr($multi_value_meta_key); ?>">Add Row</button>
         </p>
-
     <?php endforeach; ?>
     <script type="text/javascript">
         jQuery(document).ready(function($) {
@@ -109,6 +118,59 @@ function show_custom_meta_box()
             });
         });
     </script>
+
+    <?php
+    // keys with single values in a textarea field
+
+    foreach ($single_value_meta_keys as $single_value_meta_key) : ?>
+        <?php $single_meta_values = get_post_meta($post->ID, $single_value_meta_key, false); ?>
+        <div id="<?php echo esc_attr($single_value_meta_key); ?>-textarea">
+            <h3><?php echo esc_html(nice_name($single_value_meta_key)); ?></h3>
+            <?php 
+            if (!empty($single_meta_values)) :
+                foreach ($single_meta_values as $single_value) { ?>
+                    <p>
+                        <label for="<?php echo esc_attr($single_value_meta_key); ?>"><?php echo esc_html($single_value_meta_key) ?></label>
+                        <textarea name="<?php echo esc_attr($single_value_meta_key); ?>[]" rows="5" cols="60"><?php echo esc_attr($single_value); ?></textarea>
+                        <button class="remove_field button button-small">Remove</button>
+                    </p>
+                <?php }
+            else: ?>
+                </div>
+                    <p>
+                        <button class="add_field_button button button-small button-primary" data-field="<?php echo esc_attr($single_value_meta_key); ?>">Add Field</button>
+                    </p>
+                <div>
+            <?php
+            endif; ?>
+        </div>
+
+    <?php endforeach; ?>
+    <script type="text/javascript">
+        jQuery(document).ready(function($) {
+            var max_fields = 1; //maximum input boxes allowed
+
+            $('.add_field_button').click(function(e) {
+                e.preventDefault();
+                var field = $(this).data('field');
+                var wrapper = $('#' + field + '-textarea');
+                var x = wrapper.find('textarea').length;
+
+                if (x < max_fields) { //max input box allowed
+                    x++; //text box increment
+                    $(wrapper).append('<p><label for="' + field + '">' + field.replace(/_/g, ' ') + '</label><textarea name="' + field + '[]" value=""  rows="5" cols="60"></textarea><button class="remove_field button button-small">Remove</button></p>'); //add input box
+                }
+            });
+
+            $(document).on("click", ".remove_field", function(e) { //user click on remove text
+                e.preventDefault();
+                $(this).parent('p').remove();
+            });
+        });
+    </script>
+
+
+
 <?php }
 
 // Save custom meta data
@@ -133,12 +195,18 @@ function save_custom_meta($post_id)
         return $post_id;
     }
 
-    $meta_keys = get_names_keys();
+
+    $multi_value_meta_keys = get_multi_value_name_keys();
+    $single_value_meta_keys = get_single_value_name_keys();
+    $meta_keys = array_merge($multi_value_meta_keys, $single_value_meta_keys);
+
+    // $meta_keys = get_multi_value_name_keys();
 
     foreach ($meta_keys as $meta_key) {
         // Get existing meta values
         $old_meta_values = get_post_meta($post_id, $meta_key, false);
-        $new_meta_values = isset($_POST[$meta_key]) ? array_map('sanitize_text_field', $_POST[$meta_key]) : array();
+        // $new_meta_values = isset($_POST[$meta_key]) ? array_map('sanitize_text_field', $_POST[$meta_key]) : array(); // origineel van Gerard
+        $new_meta_values = isset($_POST[$meta_key]) ? $_POST[$meta_key] : array();
         // First make sure the values are unique, so there is only one value if a user fills in the same value twice.
         $unique_new_meta_values = array_unique($new_meta_values);
 
@@ -160,57 +228,3 @@ function save_custom_meta($post_id)
     }
 }
 add_action('save_post_page', 'save_custom_meta');
-
-// Function to display Name meta fields
-function display_name_meta($post_id)
-{
-    // Check if post type is 'page'
-    if (get_post_type($post_id) !== 'page') {
-        return '';
-    }
-
-    // Show the names of the host
-    $output = '';
-    $output .= "<h2>" . get_the_title() . "</h2>";
-
-    $meta_keys = get_names_keys();
-
-    // Build HTML output for each meta key
-    foreach ($meta_keys as $meta_key) {
-        $meta_values = get_post_meta($post_id, $meta_key, false);
-        if (!empty($meta_values)) {
-            $output .= '<div class="name-' . esc_attr($meta_key) . '">';
-            $output .= '<h3>' . esc_html(nice_name($meta_key)) . ':</h3>';
-            $output .= '<ul>';
-            foreach ($meta_values as $meta_value) {
-                $output .= '<li>' . esc_html($meta_value) . '</li>';
-            }
-            $output .= '</ul>';
-            $output .= '</div>';
-        }
-    }
-
-    return $output;
-}
-
-function display_all_names_meta()
-{
-    $content = '';
-    $args = array(
-        'post_type'      => 'page',
-        'posts_per_page' => -1,
-    );
-    $names_query = new WP_Query($args);
-
-    if ($names_query->have_posts()) {
-        while ($names_query->have_posts()) {
-            $names_query->the_post();
-            $names_id = get_the_ID();
-            $content .= display_names_meta($names_id);
-        }
-        wp_reset_postdata();
-    } else {
-        $content .= 'No names found.';
-    }
-    return $content;
-}
